@@ -1,0 +1,965 @@
+---
+title: "R scripts for Finks et al. 2020"
+author: "Sarai S. Finks"
+date: "04/15/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r General information}
+#sequencing data used to generate OTU tables via Qiime2 version 2018.11, can be found under NCBI SRA accession: PRJNA615043
+```
+
+```{r Setting your working directory}
+getwd()
+setwd("/Users/martinylab/Google_drive/my_projects/lrgce/final_analysis_finks_etal_2020")
+```
+
+```{r load libraries with dependencies}
+
+library(BiodiversityR)
+library(biomformat)
+library(car)
+library(data.table)
+library(doBy)
+library(dplyr)
+library(devtools)
+library(EcolUtils)
+library(emmeans)
+library(forcats)
+library(gapminder)
+library(ggplot2)
+library(ggpubr)
+library(lme4)
+library(lsmeans)
+library(lubridate)
+library(multcompView)
+library(purrr)
+library(qiime2R)
+library(readxl)
+library(rcompanion)
+library(Rmisc)
+library(scales)
+library(stringr)
+library(tidyr)
+library(tidyverse)
+library(vegan)
+library(xlsx)
+library(yaml)
+```
+
+```{r Read in bacteria and fungi OTU tables from Qiime2 pipeline and plant OTU table, echo = TRUE}
+
+###Bacteria###
+unzip(zipfile = "table_filtered.16s.qza")
+hdf5_biom.16s <- read_hdf5_biom("/Users/martinylab/Google_drive/my_projects/lrgce/final_analysis_finks_etal_2020/1a5aa860-8bb9-46e9-8a69-2499a6e1cc21/data/feature-table.biom") 
+write_biom(hdf5_biom.16s, "formatted_biom")
+json_biom.16s <- read_biom("formatted_biom")
+otu.table.16s <- as.data.frame(as.matrix(biom_data(json_biom.16s)))
+write.table(otu.table.16s, file = "otu.table.filtered.16s.tsv", quote=FALSE, sep='\t', col.names = NA)
+
+###Fungi###
+hdf5_biom.ITS <- read_hdf5_biom("~/Google_drive/my_projects/lrgce/lrgce_seq_v2/ITS/forward_final/exported/feature-table.biom")
+write_biom(hdf5_biom.ITS, "formatted_biom")
+json_biom.ITS <- read_biom("formatted_biom")
+otu.table.ITS <- as.data.frame(as.matrix(biom_data(json_biom.ITS)))
+write.table(otu.table.ITS, file = "otu.table.filtered.ITS.tsv", quote=FALSE, sep='\t', col.names = NA)
+
+###Plant###
+plant.2015.fg <- read_excel("~/Google_drive/my_projects/lrgce/final_analysis_finks_etal_2020/plant.2015.fg.xlsx")
+otu.plant.2015 <- as.data.frame(plant.2015.fg, col.names	=	TRUE,	row.names	=	TRUE)
+otu.plant.2015 [1:5 , 1:6]
+otu.plant.2015.1 <- otu.plant.2015[-1]
+row.names(otu.plant.2015.1) <- otu.plant.2015$sample_id
+otu.plant.2015.1[1:5 , 1:4]
+
+```
+
+```{r Read in bacteria, fungi, and plant metadata, echo=TRUE}
+
+combo.16s <- read_excel("~/Google_drive/my_projects/lrgce/final_analysis_finks_etal_2020/combo.16s.xlsx")
+metadata.16s <- as.data.frame(combo.16s, col.names	=	TRUE,	row.names	=	TRUE)
+metadata.16s[1:5 , 1:6]
+metadata.16s.1 <- metadata.16s[-1]
+row.names(metadata.16s.1) <- metadata.16s$Sample_id
+sapply(metadata.16s.1, class)
+metadata.16s.1[1:5 , 1:6]
+
+combo.ITS <- read_excel("~/Google_drive/my_projects/lrgce/final_analysis_finks_etal_2020/combo.ITS.xlsx")
+metadata.ITS <- as.data.frame(combo.ITS, col.names	=	TRUE,	row.names	=	TRUE)
+metadata.ITS[1:5 , 1:6]
+metadata.ITS.1 <- metadata.ITS[-1]
+row.names(metadata.ITS.1) <- metadata.ITS$sample
+sapply(metadata.ITS.1, class)
+metadata.ITS.1[1:5 , 1:6]
+
+plant.combo.meta.2015 <- read_excel("~/Google_drive/my_projects/lrgce/final_analysis_finks_etal_2020/plant.combo.meta_2015.xlsx")
+metadata.plant.2015 <- as.data.frame(plant.combo.meta.2015, col.names	=	TRUE,	row.names	=	TRUE)
+metadata.plant.2015[1:5 , 1:6]
+metadata.plant.2015.1 <- metadata.plant.2015[-1]
+row.names(metadata.plant.2015.1) <- metadata.plant.2015$sample_id
+sapply(metadata.plant.2015.1, class)
+metadata.plant.2015.1[1:5 , 1:6]
+
+```
+
+```{r Read in bacteria and fungi taxonomy files from Qiime2, echo=TRUE}
+
+taxonomy.16s <- read_excel("~/Google_drive/my_projects/lrgce/final_analysis_finks_etal_2020/taxonomy_16s.xlsx")
+taxaid.16s <- as.data.frame(taxonomy.16s, col.names	=	TRUE,	row.names	=	TRUE)
+taxaid.16s[1:2 , 1:2]
+taxaid.16s.1 <-taxaid.16s[-1]
+row.names(taxaid.16s.1) <- taxaid.16s$OTUID
+sapply(taxaid.16s.1, class)
+taxaid.16s.1[1:2 , 1:2]
+
+taxonomy.ITS <- read_excel("~/Google_drive/my_projects/lrgce/final_analysis_finks_etal_2020/taxonomy_ITS.xlsx")
+taxaid.ITS <- as.data.frame(taxonomy.ITS, col.names	=	TRUE,	row.names	=	TRUE)
+taxaid.ITS[1:2 , 1:2]
+taxaid.ITS.1 <-taxaid.ITS[-1]
+row.names(taxaid.ITS.1) <- taxaid.ITS$otu_id
+sapply(taxaid.ITS.1, class)
+taxaid.ITS.1[1:2 , 1:2]
+
+```
+
+```{r Rarefy bacterial and fungal OTU tables, echo=TRUE}
+
+###Bacteria###
+otu.plus.taxaid.16s <- as.data.frame(merge(taxaid.16s.1, otu.table.16s, by.x = "row.names", by.y = "row.names"))
+otu.plus.taxaid.filtered.16s <- otu.plus.taxaid.16s[!grepl("chloroplast", otu.plus.taxaid.16s$`taxon`),]
+otu.plus.taxaid.filtered.16s <- otu.plus.taxaid.filtered.16s[!grepl("mitochondria",otu.plus.taxaid.filtered.16s$`taxon`),]
+write.table(otu.plus.taxaid.filtered.16s, file = "otu.taxaid.filtered.16s.tsv", quote=FALSE, sep='\t', col.names = NA)
+row.names(otu.plus.taxaid.filtered.16s) <- otu.plus.taxaid.filtered.16s$Row.names
+otu.clean.16s <- as.data.frame(t(otu.plus.taxaid.filtered.16s[,4:ncol(otu.plus.taxaid.filtered.16s)]))
+write.table(otu.clean.16s, file = "otu.clean.16s.tsv", quote=FALSE, sep='\t', col.names = NA)
+
+read.depth.barplot.16s <- barplot(sort(rowSums(otu.clean.16s)), ylim = c(0, max(rowSums(otu.clean.16s))), 
+                          xlim = c(0, NROW(otu.clean.16s)), col = "Blue", ylab = "Read Depth", xlab = "Sample") 
+
+unrarfied.curves.16s <-rarecurve(otu.clean.16s, step = 1000, label = FALSE) 
+
+set.seed(seed = 999)                  
+rared.otu.16s <- as.data.frame((rrarefy.perm(otu.clean.16s, sample = 1090, n = 300, round.out = T)))#because rrarefy.perm randomly picks OTUs at a specified sequencing depth, the total number of OTUs may change with each run of the function.
+#warnings(rared.otu.16s)
+rared.otu.16s <- as.data.frame(rared.otu.16s[rowSums(rared.otu.16s) >= 1090-(1090*.1), colSums(rared.otu.16s) >= 1])
+
+rarefied.curves.16s <- rarecurve(rared.otu.16s, step = 300)
+
+rared.otu.16s.t <- t(rared.otu.16s)
+rared.otu.taxaid.16s <- merge(rared.otu.16s.t, taxaid.16s.1, by.x = "row.names", by.y = "row.names")
+write.table(rared.otu.taxaid.16s, file = "rared.otu.taxaid.16s.tsv", quote=FALSE, sep='\t', col.names = NA)
+
+###Fungi###
+otu.plus.taxaid.ITS <- as.data.frame(merge(taxaid.ITS.1, otu.table.ITS, by.x = "row.names", by.y = "row.names"))
+otu.plus.taxaid.filtered.ITS <- otu.plus.taxaid.ITS[!grepl("k__Chromista", otu.plus.taxaid.ITS$`taxon`),]
+otu.plus.taxaid.filtered.ITS <- otu.plus.taxaid.filtered.ITS[!grepl("k__Rhizaria", otu.plus.taxaid.filtered.ITS$`taxon`),]
+otu.plus.taxaid.filtered.ITS <- otu.plus.taxaid.filtered.ITS[!grepl("k__Plantae", otu.plus.taxaid.filtered.ITS$`taxon`),]
+otu.plus.taxaid.filtered.ITS <- otu.plus.taxaid.filtered.ITS[!grepl("k__Alveolata", otu.plus.taxaid.filtered.ITS$`taxon`),]
+otu.plus.taxaid.filtered.ITS <- otu.plus.taxaid.filtered.ITS[!grepl("k__Metazoa", otu.plus.taxaid.filtered.ITS$`taxon`),]
+otu.plus.taxaid.filtered.ITS <- otu.plus.taxaid.filtered.ITS[!grepl("k__Fungi;p__unidentified", otu.plus.taxaid.filtered.ITS$`taxon`),]
+write.table(otu.plus.taxaid.filtered.ITS, file = "otu.taxaid.filtered.ITS.tsv", quote=FALSE, sep='\t', col.names = NA)
+row.names(otu.plus.taxaid.filtered.ITS) <- otu.plus.taxaid.filtered.ITS$Row.names
+otu.clean.ITS <- as.data.frame(t(otu.plus.taxaid.filtered.ITS[,4:ncol(otu.plus.taxaid.filtered.ITS)]))
+write.table(otu.clean.ITS, file = "otu.clean.ITS.tsv", quote=FALSE, sep='\t', col.names = NA)
+
+read.depth.barplot.ITS <- barplot(sort(rowSums(otu.clean.ITS)), ylim = c(0, max(rowSums(otu.clean.ITS))), 
+                          xlim = c(0, NROW(otu.clean.ITS)), col = "Blue", ylab = "Read Depth", xlab = "Sample") 
+
+unrarfied.curves.ITS <-rarecurve(otu.clean.ITS, step = 1000, label = FALSE) 
+
+set.seed(seed = 999)                  
+rared.otu.ITS <- as.data.frame((rrarefy.perm(otu.clean.ITS, sample = 1064, n = 300, round.out = T)))
+#warnings(rared.otu.ITS)
+rared.otu.ITS <- as.data.frame(rared.otu.ITS[rowSums(rared.otu.ITS) >= 1064-(1064*.1), colSums(rared.otu.ITS) >= 1])
+
+rarefied.curves.ITS <- rarecurve(rared.otu.ITS, step = 300)
+
+rared.otu.ITS.t <- t(rared.otu.ITS)
+rared.otu.taxaid.ITS <- merge(rared.otu.ITS.t, taxaid.ITS.1, by.x = "row.names", by.y = "row.names")
+write.table(rared.otu.taxaid.ITS, file = "rared.otu.taxaid.ITS.tsv", quote=FALSE, sep='\t', col.names = NA)
+
+```
+
+```{r Microbial alpha diversity, microbial taxa and plant functional group bar plots, echo=TRUE}
+#Create function to read qza file into R
+read_qza <- function(file, tmp, rm) {
+  
+  if(missing(tmp)){tmp <- tempdir()}
+  if(missing(file)){stop("Path to artifact (.qza) not provided")}
+  if(missing(rm)){rm=TRUE} #remove the decompressed object from tmp
+  
+  unzip(file, exdir=tmp)
+  unpacked<-unzip(file, exdir=tmp, list=TRUE)
+  
+  artifact<-read_yaml(paste0(tmp,"/", paste0(gsub("/..+","", unpacked$Name[1]),"/metadata.yaml"))) #start by loading in the metadata not assuming it will be first file listed
+  artifact$contents<-data.frame(files=unpacked)
+  artifact$contents$size=sapply(paste0(tmp, "/", artifact$contents$files), file.size)
+  artifact$version=read.table(paste0(tmp,"/",artifact$uuid, "/VERSION"))
+  
+#if(sum(artifact$version$V2==c("2","4","2018.4.0"))!=3){warning("Artifact was not generated with Qiime2 2018.4, if data is not successfully imported, please report here github.com/jbisanz/qiime2R/issues")}#check version and throw warning if new format
+  
+#get data dependent on format
+  if(grepl("BIOMV", artifact$format)){
+    suppressWarnings(artifact$data<-as(biom_data(read_biom(paste0(tmp, "/", artifact$uui,"/data/feature-table.biom"))),"matrix")) #suppressing warning about \n characters
+  } else if (artifact$format=="NewickDirectoryFormat"){
+    artifact$data<-read.tree(paste0(tmp,"/",artifact$uuid,"/data/tree.nwk"))
+  } else if (artifact$format=="DistanceMatrixDirectoryFormat") {
+    artifact$data<-as.dist(read.table(paste0(tmp,"/", artifact$uuid, "/data/distance-matrix.tsv"), header=TRUE, row.names=1))
+  } else if (grepl("StatsDirFmt", artifact$format)) {
+    if(paste0(artifact$uuid, "/data/stats.csv") %in% artifact$contents$files.Name){artifact$data<-read.csv(paste0(tmp,"/", artifact$uuid, "/data/stats.csv"), header=TRUE, row.names=1)}
+    if(paste0(artifact$uuid, "/data/stats.tsv") %in% artifact$contents$files.Name){artifact$data<-read.table(paste0(tmp,"/", artifact$uuid, "/data/stats.tsv"), header=TRUE, row.names=1, sep='\t')} #can be tsv or csv
+  } else if (artifact$format=="TSVTaxonomyDirectoryFormat"){
+    artifact$data<-read.table(paste0(tmp,"/", artifact$uuid, "/data/taxonomy.tsv"), sep='\t', header=TRUE, quote="")
+  } else if (artifact$format=="OrdinationDirectoryFormat"){
+    
+    linesplit<-suppressWarnings(readLines(paste0(tmp,"/", artifact$uuid, "/data/ordination.txt")))
+    linesplit<-linesplit[sapply(linesplit, function(x) x!="")]
+    
+    for (i in 1:length(linesplit)){
+      if(grepl("^Eigvals\\t|^Proportion explained\\t|^Species\\t|^Site\\t|^Biplot\\t|^Site constraints\\t", linesplit[i])){
+        curfile=strsplit(linesplit[i],"\t")[[1]][1]
+      } else {
+        write(linesplit[i], paste0(tmp,"/", artifact$uuid, "/data/",curfile,".tmp"), append=TRUE)
+      }
+    }
+    
+    for (outs in list.files(paste0(tmp,"/", artifact$uuid,"/data"), full.names = TRUE, pattern = "\\.tmp")){
+      NewLab<-gsub(" ", "", toTitleCase(gsub("\\.tmp", "", basename(outs))))
+      artifact$data[[NewLab]]<-read.table(outs,sep='\t', header=FALSE)
+      if(NewLab %in% c("Eigvals","ProportionExplained")){colnames(artifact$data[[NewLab]])<-paste0("PC",1:ncol(artifact$data[[NewLab]]))}
+      if(NewLab %in% c("Site","SiteConstraints")){colnames(artifact$data[[NewLab]])<-c("SampleID", paste0("PC",1:(ncol(artifact$data[[NewLab]])-1)))}
+      if(NewLab %in% c("Species")){colnames(artifact$data[[NewLab]])<-c("FeatureID", paste0("PC",1:(ncol(artifact$data[[NewLab]])-1)))}
+    }
+    
+    artifact$data$Vectors<-artifact$data$Site
+    artifact$data$Site<-NULL
+    
+  } else if (artifact$format=="DNASequencesDirectoryFormat") {
+    artifact$data<-readDNAStringSet(paste0(tmp,"/",artifact$uuid,"/data/dna-sequences.fasta"))
+  } else if (artifact$format=="AlignedDNASequencesDirectoryFormat") {
+    artifact$data<-readDNAMultipleAlignment(paste0(tmp,"/",artifact$uuid,"/data/aligned-dna-sequences.fasta"))
+  } else if (grepl("EMPPairedEndDirFmt|EMPSingleEndDirFmt|FastqGzFormat|MultiplexedPairedEndBarcodeInSequenceDirFmt|MultiplexedSingleEndBarcodeInSequenceDirFmt|PairedDNASequencesDirectoryFormat|SingleLanePerSamplePairedEndFastqDirFmt|SingleLanePerSampleSingleEndFastqDirFmt", artifact$format)) {
+    artifact$data<-data.frame(files=list.files(paste0(tmp,"/", artifact$uuid,"/data")))
+    artifact$data$size<-format(sapply(artifact$data$files, function(x){file.size(paste0(tmp,"/",artifact$uuid,"/data/",x))}, simplify = TRUE))
+  } else if (artifact$format=="AlphaDiversityDirectoryFormat") {
+    artifact$data<-read.table(paste0(tmp, "/", artifact$uuid, "/data/alpha-diversity.tsv"))
+  } else {
+    message("Format not supported, only a list of internal files and provenance is being imported.")
+    artifact$data<-list.files(paste0(tmp,"/",artifact$uuid, "/data"))
+  }
+  
+  pfiles<-paste0(tmp,"/", grep("..+provenance/..+action.yaml", unpacked$Name, value=TRUE))
+  artifact$provenance<-lapply(pfiles, read_yaml)
+  names(artifact$provenance)<-grep("..+provenance/..+action.yaml", unpacked$Name, value=TRUE)
+  if(rm==TRUE){unlink(paste0(tmp,"/", artifact$uuid), recursive=TRUE)}
+  return(artifact)
+}
+
+###Bacteria###
+taxonomy16s<-read_qza("taxonomy16s.qza", "./tmp", rm=T)
+taxonomy16s$uuid
+taxtable16s<-taxonomy16s$data %>% as.tibble() %>% separate(Taxon, sep="; ", c("Kingdom","Phylum","Class","Order","Family","Genus","Species")) #convert the table into a tabular split version
+taxtable16s
+taxtable16s <- as.data.frame(taxtable16s)
+
+#remove p__ as a precursor to phylum name 
+taxtable16s$Phylum <- gsub("p__", "", taxtable16s$Phylum)
+taxtable16s$Class <- gsub("c__", "", taxtable16s$Class)
+taxtable16s$Order <- gsub("o__", "", taxtable16s$Order)
+taxtable16s$Family <- gsub("f__", "", taxtable16s$Family)
+taxtable16s$Genus <- gsub("g__", "", taxtable16s$Genus)
+taxtable16s$Species <- gsub("s__", "", taxtable16s$Species)
+
+#this will turn all empty cell into NA
+taxtable16s <- taxtable16s %>%
+  mutate_at(vars(colnames(.)),
+            .funs = funs(ifelse(.=="", NA, as.character(.))))
+
+#the taxa table was imported using qiime2R, with already separated levels
+row.names(taxtable16s) <- taxtable16s$Feature.ID #turn feature IDs into row.names
+taxtable16s$Feature.ID <- NULL #remove column "Feature ID"
+
+#merge OTU table with taxonomy table
+otu.raref.taxonomy.16s <- as.data.frame(merge(taxtable16s, rared.otu.16s.t, by.x = "row.names", by.y = "row.names"))
+row.names(otu.raref.taxonomy.16s) <- otu.raref.taxonomy.16s$Row.names #move column "Row.names" (first column) to row.names this was created during the merge
+otu.raref.taxonomy.16s$Row.names <- NULL #remove column "Row.names"
+otu.raref.taxonomy.16s$Confidence <- NULL # remove column "Confidence"
+otu.raref.taxonomy.16s.ss <- subset(otu.raref.taxonomy.16s, select=c(8:195,1:7)) # move Taxa information to the end of all columns
+write.table(otu.raref.taxonomy.16s.ss, "otu_raref_taxonomy.16s.csv", quote=FALSE, sep=',') #use this table to calculate top number of ASVs  and their sequence contributions.
+colSums(otu.raref.taxonomy.16s.ss[, c(1:188)]) # check if samples are RAREFIED!!
+
+# Check the number of unique OTUs at different levels, note this will vary between runs of this chunk (if rarefying OTU table each time), consider inputting same rarefied OTU table before re-running the scripts below.
+phylum.16s <- as.vector(unique(otu.raref.taxonomy.16s.ss$Phylum[!is.na(otu.raref.taxonomy.16s.ss$Phylum)]))
+length(phylum.16s) #15 phyla
+
+class.16s <- as.vector(unique(otu.raref.taxonomy.16s.ss$Class[!is.na(otu.raref.taxonomy.16s.ss$Class)]))
+length(class.16s) #34 unique bacterial classes (NA not counted) 
+
+order.16s <- as.vector(unique(otu.raref.taxonomy.16s.ss$Order[!is.na(otu.raref.taxonomy.16s.ss$Order)]))
+length(order.16s) #53 unique bacterial orders (na not counted) 
+family.16s <- as.vector(unique(otu.raref.taxonomy.16s.ss$Family[!is.na(otu.raref.taxonomy.16s.ss$Family)]))
+length(family.16s) #96 unique families (na not counted)
+
+genus.16s <- as.vector(unique(otu.raref.taxonomy.16s.ss$Genus[!is.na(otu.raref.taxonomy.16s.ss$Genus)]))
+length(genus.16s) #141 unique bacterial genus' (na not counted),
+
+#aggregate taxonomic IDs on a certain level by sample (here at Order level)
+genus.16s.1 <- aggregate(. ~Genus, data = otu.raref.taxonomy.16s.ss[c(1:(length(names(otu.raref.taxonomy.16s.ss)) - 7), match("Genus", names(otu.raref.taxonomy.16s.ss)))], FUN = sum, na.omit=TRUE)
+
+#Order column is turned into row names and the empty cell is called "unidentified" (o__ gsub into "")
+rownames(genus.16s.1) <- genus.16s.1$Genus
+genus.16s.1$Genus <- NULL
+
+#turn table into data frame and transpose
+genus.16s.1 <- as.data.frame(t(genus.16s.1))
+write.xlsx(genus.16s.1, file = "genera.16s.xlsx", sheetName = "Sheet1", col.names = TRUE, row.names=TRUE)
+
+# Merge a metadata column here (I just made my own metatdata column)
+matching.metadata.gen.16s <- metadata.16s.1[c(match(sort(row.names(genus.16s.1)), sort(row.names(metadata.16s.1)))),]
+merged.meta.gen.16s <- merge(genus.16s.1, matching.metadata.gen.16s, by.x = "row.names", by.y = "row.names")
+colnames(merged.meta.gen.16s)[colnames(merged.meta.gen.16s)=="Row.names"] <- "SampleID"
+merged.meta.gen.16s <- as.data.frame(merged.meta.gen.16s)
+rownames(merged.meta.gen.16s) <- merged.meta.gen.16s$SampleID
+merged.meta.gen.16s$SampleID <- NULL
+
+#aggregate only the X number of the level of taxonomy chosen (from the sequence summaries above) with the metadata selected in this case plot Treatment
+genera.agg.16s <- aggregate(merged.meta.gen.16s[, 1:141], list(merged.meta.gen.16s$eco.prec), mean) #genus
+genera.agg.16s <- as.data.frame(t(genera.agg.16s)) # transpose table to have variables as columns
+names(genera.agg.16s) <- as.character(unlist(genera.agg.16s["Group.1", ])) # transposing causes the treatments named as "Group.1", remove this
+genera.agg.16s <- genera.agg.16s[-1,] #final removal of "Group.1" 
+for(i in c(1:ncol(genera.agg.16s))) {
+  genera.agg.16s[,i] <- as.numeric(as.character(genera.agg.16s[,i]))
+}
+write.xlsx(genera.agg.16s, file = "plot.genera.16s.xlsx", sheetName = "Sheet1", col.names = TRUE, row.names=TRUE)
+
+#calculate the number of sequences per level (change the divisor according to above calculation for unique OTUs per level)
+totalseqs.16s <- colSums(genera.agg.16s) 
+avgnumseqs.16s <- sum(totalseqs.16s)/141 #141 is the total number of unique genera with NA removed
+
+# CHECK FOR THE MOST ABUNDANT of classification level selected HERE!!!!
+genera.agg.16s$Genus <- row.names(genera.agg.16s)
+genera.agg.16s$Genus <- factor(genera.agg.16s$Genus)
+sumsum.16s <- colSums(genera.agg.16s[1:(length(names(genera.agg.16s))-1)])
+samp.16s <- names(genera.agg.16s)[1:(length(names(genera.agg.16s))-1)]
+genera.agg.long.16s <- melt(genera.agg.16s, id.vars = "Genus", measure.vars = c("CSS_Ambient","CSS_Reduced", "Grass_Ambient","Grass_Reduced"))
+genera.agg.long.16s$Abundance <- ifelse(genera.agg.long.16s$variable == samp.16s[1], genera.agg.long.16s$value / sumsum.16s[1],
+                                    ifelse(genera.agg.long.16s$variable == samp.16s[2], genera.agg.long.16s$value / sumsum.16s[2],
+                                           ifelse(genera.agg.long.16s$variable == samp.16s[3], genera.agg.long.16s$value / sumsum.16s[3],
+                                                  ifelse(genera.agg.long.16s$variable == samp.16s[4], genera.agg.long.16s$value / sumsum.16s[4],"NA" ))))
+
+#call everything below 0.01 (1%) "other_genera"
+genera.agg.long.16s$Genus[genera.agg.long.16s$Abundance < 0.01] <- genera.agg.long.16s$Genus["other_genera"] #turn all genera that are below 1% first into "NA" then into "other_genera"
+genera.agg.long.16s$Genus <- as.character(genera.agg.long.16s$Genus)
+genera.agg.long.16s$Genus[is.na(genera.agg.long.16s$Genus)] <- "other_genera"
+genera.agg.long.16s$Abundance <- as.numeric(genera.agg.long.16s$Abundance)
+
+# Checking to make sure it adds to 1 precisely
+for (i in 1:length(samp.16s)) {
+  print(paste0("For precipitation treatment ", samp.16s[i], " the relative abundance adds to: ", sum(genera.agg.long.16s[genera.agg.long.16s$variable == samp.16s[i], ]$Abundance), "."))
+}
+
+#create stacked bar plot 
+genera.agg.long.16s$Genus <- factor(genera.agg.long.16s$Genus)
+genera.agg.long.16s$Genus = with(genera.agg.long.16s, reorder(Genus, -Abundance))
+#genera.agg.long.16s$Genus <- relevel(genera.agg.long.16s$Genus, 'other_genera') #if want the "other_genera" at the top of the plot.
+
+c36 <- c("#c8c9c9",
+"#bda69d",
+"#284d50",
+"#c1a4a6",
+"#344b4a",
+"#b2a6bd",
+"#58423a",
+"#8eb2a9",
+"#594152",
+"#83adad",
+"#56414b",
+"#b2aa97",
+"#484555",
+"#a9ac9f",
+"#3a4951",
+"#b4a8ab",
+"#414849",
+"#a1adac",
+"#544341",
+"#749ca7",
+"#5f5740",
+"#a98d9e",
+"#4b5d49",
+"#b4908d",
+"#3a586a",
+"#896d5f",
+"#4e5269",
+"#7d8168",
+"#665b72",
+"#718c7a",
+"#6d505d",
+"#517368",
+"#86656c",
+"#46474a",
+"#7c819a",
+"#967471")
+
+barplot.genus.16s <- ggplot(genera.agg.long.16s, aes(x = fct_relevel(variable, "Grass_Ambient","Grass_Reduced","CSS_Ambient","CSS_Reduced"), y = Abundance, fill = Genus)) +
+                     theme_test() +  
+                     geom_bar(stat = "identity", width = 0.7) +
+                     theme(axis.line.x=element_line(colour = "black"), axis.line.y=element_line(colour = "black")) + 
+                     scale_fill_manual(values = c36) +
+                     scale_y_continuous(expand = c(0, 0)) +
+                     labs(fill = "Genus") +
+                     theme(legend.position = "none") + #Change to "right" to display legend at the right of the plot
+                     guides(size = "none") +
+                     labs(x = "Ecosystem by Water Input", y = "Proportion of Total Bacterial Community")
+
+plot(barplot.genus.16s)
+
+###Fungi###
+taxonomyITS<-read_qza("taxonomyITS.qza", "./tmp", rm=T)
+taxonomyITS$uuid
+taxtableITS<-taxonomyITS$data %>% as.tibble() %>% separate(Taxon, sep=";", c("Kingdom","Phylum","Class","Order","Family","Genus","Species")) #convert the table into a tabular split version
+taxtableITS
+taxtableITS <- as.data.frame(taxtableITS)
+
+#remove p__ as a precursor to phylum name 
+taxtableITS$Phylum <- gsub("p__", "", taxtableITS$Phylum)
+taxtableITS$Class <- gsub("c__", "", taxtableITS$Class)
+taxtableITS$Order <- gsub("o__", "", taxtableITS$Order)
+taxtableITS$Family <- gsub("f__", "", taxtableITS$Family)
+taxtableITS$Genus <- gsub("g__", "", taxtableITS$Genus)
+taxtableITS$Species <- gsub("s__", "", taxtableITS$Species)
+
+#this will turn all empty cell into NA
+taxtableITS <- taxtableITS %>%
+  mutate_at(vars(colnames(.)),
+            .funs = funs(ifelse(.=="", NA, as.character(.))))
+
+#taxa table was imported using qiime2R, with already separated levels
+row.names(taxtableITS) <- taxtableITS$Feature.ID #turn feature IDs into row.names
+taxtableITS$Feature.ID <- NULL #remove column "Feature ID"
+
+#merge OTU table with taxonomy table
+otu.raref.taxonomy.ITS <- as.data.frame(merge(taxtableITS, rared.otu.ITS.t, by.x = "row.names", by.y = "row.names"))
+row.names(otu.raref.taxonomy.ITS) <- otu.raref.taxonomy.ITS$Row.names #move column "Row.names" (first column) to row.names this was created during the merge
+otu.raref.taxonomy.ITS$Row.names <- NULL #remove column "Row.names"
+otu.raref.taxonomy.ITS$Confidence <- NULL # remove column "Confidence"
+otu.raref.taxonomy.ITS.ss <- subset(otu.raref.taxonomy.ITS, select=c(8:195,1:7)) # move Taxa information to the end of all columns
+write.table(otu.raref.taxonomy.ITS.ss, "otu_raref_taxonomy.ITS.csv", quote=FALSE, sep=',') #use this table to calculate top number of ASVs  and their sequence contributions.
+colSums(otu.raref.taxonomy.ITS.ss[, c(1:188)]) # check if samples are RAREFIED!!
+
+# Check the number of unique OTUs at different levels, note this will vary between runs of this chunk (if rarefying OTU table each time), consider inputting same rarefied OTU table before re-running the scripts below.
+phylum.ITS <- as.vector(unique(otu.raref.taxonomy.ITS.ss$Phylum[!is.na(otu.raref.taxonomy.ITS.ss$Phylum)]))
+length(phylum.ITS) #4 phyla
+
+class.ITS <- as.vector(unique(otu.raref.taxonomy.ITS.ss$Class[!is.na(otu.raref.taxonomy.ITS.ss$Class)]))
+length(class.ITS) #21 unique bacterial classes (NA not counted) 
+
+order.ITS <- as.vector(unique(otu.raref.taxonomy.ITS.ss$Order[!is.na(otu.raref.taxonomy.ITS.ss$Order)]))
+length(order.ITS) #67 unique bacterial orders (na not counted) 
+
+family.ITS <- as.vector(unique(otu.raref.taxonomy.ITS.ss$Family[!is.na(otu.raref.taxonomy.ITS.ss$Family)]))
+length(family.ITS) #155 unique families (na not counted)
+
+genus.ITS <- as.vector(unique(otu.raref.taxonomy.ITS.ss$Genus[!is.na(otu.raref.taxonomy.ITS.ss$Genus)]))
+length(genus.ITS) #274 unique bacterial genus' (na not counted) 
+
+#aggregate taxonomic IDs on a certain level by sample (here at Order level)
+genus.ITS.1 <- aggregate(. ~Genus, data = otu.raref.taxonomy.ITS.ss[c(1:(length(names(otu.raref.taxonomy.ITS.ss)) - 7), match("Genus", names(otu.raref.taxonomy.ITS.ss)))], FUN = sum, na.omit=TRUE)
+
+#Order column is turned into row names and the empty cell is called "unidentified" (o__ gsub into "")
+rownames(genus.ITS.1) <- genus.ITS.1$Genus
+genus.ITS.1$Genus <- NULL
+
+#turn table into data frame and transpose
+genus.ITS.1 <- as.data.frame(t(genus.ITS.1))
+write.xlsx(genus.ITS.1, file = "genera.ITS.xlsx", sheetName = "Sheet1", col.names = TRUE, row.names=TRUE)
+
+# Merge a metadata column here (I just made my own metatdata column)
+matching.metadata.gen.ITS <- metadata.ITS.1[c(match(sort(row.names(genus.ITS.1)), sort(row.names(metadata.ITS.1)))),]
+merged.meta.gen.ITS <- merge(genus.ITS.1, matching.metadata.gen.ITS, by.x = "row.names", by.y = "row.names")
+colnames(merged.meta.gen.ITS)[colnames(merged.meta.gen.ITS)=="Row.names"] <- "SampleID"
+merged.meta.gen.ITS <- as.data.frame(merged.meta.gen.ITS)
+rownames(merged.meta.gen.ITS) <- merged.meta.gen.ITS$SampleID
+merged.meta.gen.ITS$SampleID <- NULL
+
+#aggregate only the X number of the level of taxonomy chosen (from the sequence summaries above) with the metadata selected in this case plot Treatment
+genera.agg.ITS <- aggregate(merged.meta.gen.ITS[, 1:274], list(merged.meta.gen.ITS$eco.prec), mean) #genus
+genera.agg.ITS <- as.data.frame(t(genera.agg.ITS)) # transpose table to have variables as columns
+names(genera.agg.ITS) <- as.character(unlist(genera.agg.ITS["Group.1", ])) # transposing causes the treatments named as "Group.1", remove this
+genera.agg.ITS <- genera.agg.ITS[-1,] #final removal of "Group.1" 
+for(i in c(1:ncol(genera.agg.ITS))) {
+  genera.agg.ITS[,i] <- as.numeric(as.character(genera.agg.ITS[,i]))
+}
+write.xlsx(genera.agg.ITS, file = "plot.genera.ITS.xlsx", sheetName = "Sheet1", col.names = TRUE, row.names=TRUE)
+
+#calculate the number of sequences per level (change the divisor according to above calculation for unique OTUs per level)
+totalseqs.ITS <- colSums(genera.agg.ITS) 
+avgnumseqs.ITS <- sum(totalseqs.ITS)/274 #274 is the total number of unique genera with NA removed
+
+# CHECK FOR THE MOST ABUNDANT of classification level selected HERE!!!!
+genera.agg.ITS$Genus <- row.names(genera.agg.ITS)
+genera.agg.ITS$Genus <- factor(genera.agg.ITS$Genus)
+sumsum.ITS <- colSums(genera.agg.ITS[1:(length(names(genera.agg.ITS))-1)])
+samp.ITS <- names(genera.agg.ITS)[1:(length(names(genera.agg.ITS))-1)]
+
+genera.agg.long.ITS <- melt(genera.agg.ITS, id.vars = "Genus", measure.vars = c("CSS_Ambient","CSS_Reduced", "Grass_Ambient","Grass_Reduced"))
+
+genera.agg.long.ITS$Abundance <- ifelse(genera.agg.long.ITS$variable == samp.ITS[1], genera.agg.long.ITS$value / sumsum.ITS[1],
+                                    ifelse(genera.agg.long.ITS$variable == samp.ITS[2], genera.agg.long.ITS$value / sumsum.ITS[2],
+                                           ifelse(genera.agg.long.ITS$variable == samp.ITS[3], genera.agg.long.ITS$value / sumsum.ITS[3],
+                                                  ifelse(genera.agg.long.ITS$variable == samp.ITS[4], genera.agg.long.ITS$value / sumsum.ITS[4],"NA" ))))
+
+#call everything below 0.01 (1%) "other_genera"
+genera.agg.long.ITS$Genus[genera.agg.long.ITS$Abundance < 0.01] <- genera.agg.long.ITS$Genus["other_genera"] #turn all genera that are below 1% first into "NA" then into "other_genera"
+genera.agg.long.ITS$Genus[ genera.agg.long.ITS$Genus == "unidentified" ] <- NA
+genera.agg.long.ITS$Genus <- as.character(genera.agg.long.ITS$Genus)
+genera.agg.long.ITS$Genus[is.na(genera.agg.long.ITS$Genus)] <- "other_genera"
+
+genera.agg.long.ITS$Abundance <- as.numeric(genera.agg.long.ITS$Abundance)
+
+# Checking to make sure it adds to 1 precisely
+for (i in 1:length(samp.ITS)) {
+  print(paste0("For precipitation treatment ", samp.ITS[i], " the relative abundance adds to: ", sum(genera.agg.long.ITS[genera.agg.long.ITS$variable == samp.ITS[i], ]$Abundance), "."))
+}
+
+#create stacked barplot 
+genera.agg.long.ITS$Genus <- factor(genera.agg.long.ITS$Genus)
+genera.agg.long.ITS$Genus = with(genera.agg.long.ITS, reorder(Genus, -Abundance))
+#genera.agg.long.ITS$Genus <- relevel(genera.agg.long.ITS$Genus, "other_genera") #if want the "other_genera" at the top of the plot.
+
+c18 <- c("#c8c9c9",
+         "#264d4c",
+         "#bfa4ab",
+         "#88abbc",
+         "#645b44",
+         "#ac9fb8",
+         "#736f56",
+         "#9692ac",
+         "#7c6054",
+         "#5f8791",
+         "#b7988b",
+         "#604b5e",
+         "#738b77",
+         "#93737e",
+         "#5a7c71",
+         "#8e8c72",
+         "#587789",
+         "#676666") 
+
+barplot.genus.ITS <- ggplot(genera.agg.long.ITS, aes(x = fct_relevel(variable, "Grass_Ambient","Grass_Reduced","CSS_Ambient","CSS_Reduced"), y = Abundance, fill = Genus)) +
+                     theme_test() +  
+                     geom_bar(stat = "identity", width = 0.7) +
+                     theme(axis.line.x=element_line(colour = "black"), axis.line.y=element_line(colour = "black")) + 
+                     scale_fill_manual(values = c18) +
+                     scale_y_continuous(expand = c(0, 0)) +
+                     labs(fill = "Genus") +
+                     theme(legend.position = "none") + #Change to "right" to display legend at the right of the plot
+                     guides(size = "none") +
+                     labs(x = "Ecosystem by Water Input", y = "Proportion of Total Fungal Community")
+
+plot(barplot.genus.ITS)
+
+###Plant###
+plant.func.2015 <- read_excel("plant_barplot.2015.eco.pre.xlsx")
+plant.func.2015 <- as.data.frame(plant.func.2015, col.names	=	TRUE,	row.names	=	TRUE)
+plant.func.2015[1:3 , 1:3]
+
+c07 <- c("#344c60",
+         "#baa6ab",
+         "#3f4944",
+         "#7b9a8b",
+         "#85778e",
+         "#5c5f47",
+         "#82655a")
+
+barplot.plant.2015 <- ggplot(plant.func.2015, aes(x = fct_relevel(community,"grass_ambient","grass_reduced","css_ambient","css_reduced"), y = percentage, fill = functional_group)) +
+                                geom_col(aes(fill = factor(functional_group, levels = c("NativeGrassCover", "NonNativeGrassCover","NativeShrubCover","NativeForbCover", "NonNativeForbCover", "Litter",     
+                                "Bare")))) +
+                                theme_test() +  
+                                geom_bar(stat = "identity", width = 0.7) +
+                                theme(axis.line.x=element_line(colour = "black"), axis.line.y=element_line(colour = "black")) + 
+                                scale_y_continuous(expand = c(0, 0)) +
+                                scale_fill_manual(values = c07) +
+                                labs(fill = "factor") +
+                                theme(legend.position = "none") + #Change to "right" to display legend at the right of the plot
+                                guides(size = "right") +
+                                labs(x = "Plant Functional Groups by Ecosystem", y = "Proportion Fractional Cover") 
+
+plot(barplot.plant.2015)
+
+###Plot Bacterial, Fungal, and Plant in one figure###
+combined.stacked.taxa.genus <- ggarrange(barplot.genus.16s, barplot.genus.ITS, barplot.plant.2015, barplot.plant.2015, labels = c("A.", "B.","C.","D."), ncol = 2, nrow = 2, widths = c(5,5,5,5))
+plot(combined.stacked.taxa.genus)
+
+###Richness and Evenness###
+
+###Bacteria###
+attach(metadata.16s.1)
+Nitrogen<-factor(Nitrogen)
+Precipitation <- as.factor(Precipitation)
+Block <- as.factor(Block)
+Plot <- as.factor(Plot)
+Collection_date <- as.factor(Collection_date)
+eco.prec <- as.factor(eco.prec)
+eco.nit <- as.factor(eco.nit)
+
+bact.aov.richness <- lmer(richness ~ Block + Ecosystem*Precipitation + Ecosystem*Nitrogen + Ecosystem*Collection_date  + Collection_date*Precipitation + Collection_date*Nitrogen + Precipitation*Nitrogen + ( 1 | Block:Ecosystem), REML = FALSE, data = metadata.16s.1)
+anova(bact.aov.richness, type = "III")
+
+bact.eco.prec.rich <- ggplot(data = bact.aov.richness, aes(x = factor(eco.prec, levels = c("Grass_Ambient","Grass_Reduced","CSS_Ambient", "CSS_Reduced")), y = metadata.16s.1$richness, fill = metadata.16s.1$Precipitation)) + 
+                      geom_boxplot() +
+                      geom_dotplot(binaxis='y', stackdir='center',
+                      position=position_dodge(0.75), dotsize = 0.65) +
+                      scale_fill_manual(values=c('#408080', '#FF8040')) +
+                      labs(title = 'Bacterial Richness by Ecosystem', x = 'Ecosystem', y = 'Richness', fill = 'Precipitation') +
+                      theme_classic() +
+                      theme(panel.grid.major = element_blank(), 
+                      panel.grid.minor = element_blank(), 
+                      panel.background = element_blank(),
+                      panel.border = element_blank())
+
+plot(bact.eco.prec.rich)
+
+bact.eco.prec.tuk.rich <- TukeyHSD(aov(formula = metadata.16s.1$richness ~ as.character(metadata.16s.1$eco.prec)))
+bact.eco.prec.tuk.rich
+
+bact.eco.nit.rich <- ggplot(data = bact.aov.richness, aes(x = factor(eco.nit, levels = c("Grass_Ambient","Grass_Added","CSS_Ambient", "CSS_Added")), y = metadata.16s.1$richness, fill = metadata.16s.1$Nitrogen)) + 
+                     geom_boxplot() +
+                     geom_dotplot(binaxis='y', stackdir='center',
+                     position=position_dodge(0.75), dotsize = 0.65) +
+                     scale_fill_manual(values=c('#b7a28c','#408080')) +
+                     labs(title = 'Bacterial Richness by Ecosystem', x = 'Ecosystem', y = 'Richness', fill = 'Nitrogen') +
+                     theme_classic() +
+                     theme(panel.grid.major = element_blank(), 
+                     panel.grid.minor = element_blank(), 
+                     panel.background = element_blank(),
+                     panel.border = element_blank())
+
+plot(bact.eco.nit.rich)
+
+bact.aov.shannon <- lmer(shannon ~ Block + Ecosystem*Precipitation + Ecosystem*Nitrogen + Ecosystem*Collection_date  + Collection_date*Precipitation + Collection_date*Nitrogen + Precipitation*Nitrogen + ( 1 | Block:Ecosystem), REML = FALSE, data = metadata.16s.1)
+anova(bact.aov.shannon, type = "III")
+
+bact.eco.prec.shannon <- ggplot(data = bact.aov.shannon, aes(x = factor(eco.prec, levels = c("Grass_Ambient","Grass_Reduced","CSS_Ambient", "CSS_Reduced")), y = metadata.16s.1$shannon, fill = metadata.16s.1$Precipitation)) + 
+                         geom_boxplot() +
+                         geom_dotplot(binaxis='y', stackdir='center',
+                         position=position_dodge(0.75), dotsize = 0.65) +
+                         scale_fill_manual(values=c('#408080', '#FF8040')) +
+                         labs(title = 'Bacterial Evenness by Ecosystem', x = 'Ecosystem', y = 'Evenness', fill = 'Precipitation') +
+                         theme_classic() +
+                         #theme(legend.position = "none") +
+                         theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), panel.border = element_blank())
+
+bact.eco.prec.tuk.shannon <- TukeyHSD(aov(formula = metadata.16s.1$shannon ~ as.character(metadata.16s.1$eco.prec)))
+bact.eco.prec.tuk.shannon
+
+bact.eco.nit.shannon <- ggplot(data = bact.aov.shannon, aes(x = factor(eco.nit, levels = c("Grass_Ambient","Grass_Added","CSS_Ambient", "CSS_Added")), y = metadata.16s.1$shannon, fill = metadata.16s.1$Nitrogen)) + 
+                        geom_boxplot() +
+                        geom_dotplot(binaxis='y', stackdir='center', position=position_dodge(0.75), dotsize = 0.65) +
+                        scale_fill_manual(values=c('#b7a28c','#408080')) +
+                        labs(title = 'Bacterial Evenness by Ecosystem', x = 'Ecosystem', y = 'Evenness', fill = 'Nitrogen') +
+                        theme_classic() +
+                        #theme(legend.position = "none") +
+                        theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), panel.border = element_blank())
+
+plot(bact.eco.nit.shannon)
+
+detach(metadata.16s.1)
+
+###Fungi###
+attach(metadata.ITS.1)
+Nitrogen<-factor(Nitrogen)
+Precipitation <- as.factor(Precipitation)
+Block <- as.factor(Block)
+Plot <- as.factor(Plot)
+Collection_date <- as.factor(Collection_date)
+eco.prec <- as.factor(eco.prec)
+eco.nit <- as.factor(eco.nit)
+
+fung.aov.richness <- lmer(richness ~ Block + Ecosystem*Precipitation + Ecosystem*Nitrogen + Ecosystem*Collection_date  + Collection_date*Precipitation + Collection_date*Nitrogen + Precipitation*Nitrogen + ( 1 | Block:Ecosystem), REML = FALSE, data = metadata.ITS.1)
+anova(fung.aov.richness, type = "III")
+
+fung.eco.prec.rich <- ggplot(data = fung.aov.richness, aes(x = factor(eco.prec, levels = c("Grass_Ambient","Grass_Reduced","CSS_Ambient", "CSS_Reduced")), y = metadata.ITS.1$richness, fill = metadata.ITS.1$Precipitation)) + 
+                      geom_boxplot() +
+                      geom_dotplot(binaxis='y', stackdir='center',
+                      position=position_dodge(0.75), dotsize = 0.65) +
+                      scale_fill_manual(values=c('#408080', '#FF8040')) +
+                      labs(title = 'Fungal Richness by Ecosystem', x = 'Ecosystem', y = 'Richness', fill = 'Precipitation') +
+                      theme_classic() +
+                      theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), panel.border = element_blank())
+
+plot(fung.eco.prec.rich)
+
+fung.eco.prec.tuk.rich <- TukeyHSD(aov(formula = metadata.ITS.1$richness ~ as.character(metadata.ITS.1$eco.prec)))
+fung.eco.prec.tuk.rich
+
+fung.eco.nit.rich <- ggplot(data = fung.aov.richness, aes(x = factor(eco.nit, levels = c("Grass_Ambient","Grass_Added","CSS_Ambient", "CSS_Added")), y = metadata.ITS.1$richness, fill = metadata.ITS.1$Nitrogen)) + 
+                     geom_boxplot() +
+                     geom_dotplot(binaxis='y', stackdir='center', position=position_dodge(0.75), dotsize = 0.65) +
+                     scale_fill_manual(values=c('#b7a28c','#408080')) +
+                     labs(title = 'Fungal Richness by Ecosystem', x = 'Ecosystem', y = 'Richness', fill = 'Nitrogen') +
+                     theme_classic() +
+                     theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), panel.border = element_blank())
+
+plot(fung.eco.nit.rich)
+
+fung.aov.shannon <- lmer(shannon ~ Block + Ecosystem*Precipitation + Ecosystem*Nitrogen + Ecosystem*Collection_date  + Collection_date*Precipitation + Collection_date*Nitrogen + Precipitation*Nitrogen + ( 1 | Block:Ecosystem), REML = FALSE, data = metadata.ITS.1)
+anova(fung.aov.shannon, type = "III")
+
+fung.eco.prec.shannon <- ggplot(data = fung.aov.shannon, aes(x = factor(eco.prec, levels = c("Grass_Ambient","Grass_Reduced","CSS_Ambient", "CSS_Reduced")), y = metadata.ITS.1$shannon, fill = metadata.ITS.1$Precipitation)) + 
+                         geom_boxplot() +
+                         geom_dotplot(binaxis='y', stackdir='center',
+                         position=position_dodge(0.75), dotsize = 0.65) +
+                         scale_fill_manual(values=c('#408080', '#FF8040')) +
+                         labs(title = 'Fungal Evenness by Ecosystem', x = 'Ecosystem', y = 'Evenness', fill = 'Precipitation') +
+                         theme_classic() +
+                         theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), panel.border = element_blank())
+
+plot(fung.eco.prec.shannon)
+
+fung.eco.prec.tuk.shannon <- TukeyHSD(aov(formula = metadata.ITS.1$shannon ~ as.character(metadata.ITS.1$eco.prec)))
+fung.eco.prec.tuk.shannon
+
+fung.eco.nit.shannon <- ggplot(data = fung.aov.shannon, aes(x = factor(eco.nit, levels = c("Grass_Ambient","Grass_Added","CSS_Ambient", "CSS_Added")), y = metadata.ITS.1$shannon, fill = metadata.ITS.1$Nitrogen)) + 
+                        geom_boxplot() +
+                        geom_dotplot(binaxis='y', stackdir='center', position=position_dodge(0.75), dotsize = 0.65) +
+                        scale_fill_manual(values=c('#b7a28c','#408080')) +
+                        labs(title = 'Fungal Evenness by Ecosystem', x = 'Ecosystem', y = 'Evenness', fill = 'Nitrogen') +
+                        theme_classic() +
+                        theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), panel.border = element_blank())
+
+
+plot(fung.eco.nit.shannon)
+
+combined_rich_shan_bact_fun.precipitation <- ggarrange(bact.eco.prec.rich, bact.eco.prec.shannon, fung.eco.prec.rich, fung.eco.prec.shannon, labels = c("A.", "B.", "C.", "D."), ncol = 2, nrow = 2, widths = c(5,5)) # to remove legends and titles add "#" next to labs options of the individual plots.
+plot(combined_rich_shan_bact_fun.precipitation)
+
+combined_rich_shan_bact_fun.nitrogen <- ggarrange(bact.eco.nit.rich, bact.eco.nit.shannon, fung.eco.nit.rich, fung.eco.nit.shannon, labels = c("A.", "B.", "C.", "D."), ncol = 2, nrow = 2, widths = c(5,5))
+plot(combined_rich_shan_bact_fun.nitrogen)
+
+detach(metadata.ITS.1)
+
+```
+
+```{r Microbial and plant beta diversity, NMDS ordination, and estimated Variance explianed (from PRIMERe SAS)}
+
+###Bacteria###
+median.avg.dist.16s <- avgdist(otu.clean.16s, sample = 1090, iterations = 1000, meanfun = median, dmethod = "bray")
+bray.dist.16s <- as.data.frame(as.matrix(median.avg.dist.16s))
+write.xlsx2(bray.dist.16s, file = "bray.dist.16s.xlsx", sheetName = "Sheet1", col.names = TRUE, row.names = TRUE, append = FALSE)
+NMDS.16s <- metaMDS(bray.dist.16s, distance = "bray", k = 3, noshare = FALSE, trymax = 400, trace = TRUE)
+stressplot(NMDS.16s)
+coordinates.16s <- data.frame(NMDS.16s$points[,1:3])
+nmds.metadata.16s <- merge(coordinates.16s, metadata.16s.1, by.x = "row.names", by.y = "row.names")
+nmds.metadata.16s <- data.frame(nmds.metadata.16s, col.names	=	TRUE,	row.names	=	TRUE)
+
+
+bacteria.nmds.plot <-  ggplot(data = nmds.metadata.16s) +
+                       aes(x = MDS1, y = MDS3, color = as.factor(Precipitation)) +
+                       geom_point(aes(shape = as.factor(Ecosystem), size = as.factor(Ecosystem))) +
+                       scale_color_manual(values = c('#408080', '#FF8040')) +
+                       scale_shape_manual(values = c(17,16)) +
+                       scale_size_manual(values = c(5,5)) +
+                       geom_text(label = as.factor(nmds.metadata.16s$eco.prec), size = 1) +
+                       theme_minimal() + 
+                       theme(legend.position = "none") +
+                       labs(col = "Precipitation", shape = "Ecosystem") + 
+                       theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+                       panel.background = element_blank(), panel.border = element_rect(colour = "black", fill=NA, size=1), axis.text.x=element_blank(), 
+                       axis.ticks.x=element_blank(),axis.text.y=element_blank(),  
+                       axis.ticks.y=element_blank())
+
+plot(bacteria.nmds.plot)
+
+###Season_effects###
+
+cent.16s <- aggregate(cbind(MDS1, MDS3) ~ eco.prec.seas, data = nmds.metadata.16s, FUN = mean)
+segs.16s <- merge(nmds.metadata.16s, setNames(cent.16s, c('eco.prec.seas','oMDS1','oMDS3')), by = 'eco.prec.seas',sort =FALSE)
+
+bacteria.nmds.seas.plot <-  ggplot(segs.16s, aes(x = MDS1, y = MDS3, colour = eco.prec.seas, shape = eco.prec.seas)) +
+                            geom_segment(data = segs.16s, mapping = aes(xend = oMDS1, yend = oMDS3), size = 0.1) + 
+                            geom_point(data = cent.16s, size = 6) +                         
+                            geom_point(size = 3) +  
+                            scale_color_manual(values = c('#408080','#408080', '#FF8040','#FF8040','#408080','#408080', '#FF8040','#FF8040')) +
+                            scale_shape_manual(values = c(2,17,2,17,1,16,1,16)) +
+                            coord_fixed() +
+                            #geom_text(label = as.factor(segs.16s$eco.prec.seas), size = 1) +
+                            theme_minimal() + 
+                            theme(legend.position = "none") +
+                            theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+                            panel.background = element_blank(), panel.border = element_rect(colour = "black", fill=NA, size=1), axis.text.x=element_blank(), 
+                            axis.ticks.x=element_blank(),axis.text.y=element_blank(), 
+                            axis.ticks.y=element_blank())
+
+                             
+plot(bacteria.nmds.seas.plot)
+
+
+
+PERMANOVA.16s <- adonis(bray.dist.16s ~ Block + Ecosystem*Precipitation + Ecosystem*Nitrogen + Ecosystem*Collection_date + Collection_date*Precipitation + Collection_date*Nitrogen + Precipitation*Nitrogen, data = nmds.metadata.16s, strata = nmds.metadata.16s$Block, permutations = 999)
+
+PERMANOVA.16s
+
+###Fungi###
+median.avg.dist.ITS <- avgdist(otu.clean.ITS, sample = 1064, iterations = 1000, meanfun = median, dmethod = "bray")
+bray.dist.ITS <- as.data.frame(as.matrix(median.avg.dist.ITS))
+write.xlsx2(bray.dist.ITS, file = "bray.dist.ITS.xlsx", sheetName = "Sheet1", col.names = TRUE, row.names = TRUE, append = FALSE)
+NMDS.ITS <- metaMDS(bray.dist.ITS, distance = "bray", k = 3, noshare = FALSE, trymax = 400, trace = TRUE)
+stressplot(NMDS.ITS)
+coordinates.ITS <- data.frame(NMDS.ITS$points[,1:3])
+nmds.metadata.ITS <- merge(coordinates.ITS, metadata.ITS.1, by.x = "row.names", by.y = "row.names")
+nmds.metadata.ITS <- data.frame(nmds.metadata.ITS, col.names	=	TRUE,	row.names	=	TRUE)
+
+fungi.nmds.plot <-  ggplot(data = nmds.metadata.ITS) +
+                       aes(x = MDS1, y = MDS3, color = as.factor(Precipitation)) +
+                       geom_point(aes(shape = as.factor(Ecosystem), size = as.factor(Ecosystem))) +
+                       scale_color_manual(values = c('#408080', '#FF8040')) +
+                       scale_shape_manual(values = c(17,16)) +
+                       scale_size_manual(values = c(5,5)) +
+                       geom_text(label = as.factor(nmds.metadata.ITS$eco.prec), size = 1) +
+                       theme_minimal() + 
+                       theme(legend.position = "none") +
+                       labs(col = "Precipitation", shape = "Ecosystem") + 
+                       theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+                       panel.background = element_blank(), panel.border = element_rect(colour = "black", fill=NA, size=1), axis.text.x=element_blank(), 
+                       axis.ticks.x=element_blank(),axis.text.y=element_blank(),  
+                       axis.ticks.y=element_blank())
+
+plot(fungi.nmds.plot)
+
+###Season_effects###
+
+cent.ITS <- aggregate(cbind(MDS1, MDS3) ~ eco.prec.seas, data = nmds.metadata.ITS, FUN = mean)
+segs.ITS <- merge(nmds.metadata.ITS, setNames(cent.ITS, c('eco.prec.seas','oMDS1','oMDS3')), by = 'eco.prec.seas',sort =FALSE)
+
+fungi.nmds.seas.plot <-  ggplot(segs.ITS, aes(x = MDS1, y = MDS3, colour = eco.prec.seas, shape = eco.prec.seas)) +
+                            geom_segment(data = segs.ITS, mapping = aes(xend = oMDS1, yend = oMDS3), size = 0.1) + 
+                            geom_point(data = cent.ITS, size = 6) +                         
+                            geom_point(size = 3) +  
+                            scale_color_manual(values = c('#408080','#408080', '#FF8040','#FF8040','#408080','#408080', '#FF8040','#FF8040')) +
+                            scale_shape_manual(values = c(17,2,17,2,16,1,16,1)) +
+                            coord_fixed() +
+                            #geom_text(label = as.factor(segs.ITS$eco.prec.seas), size = 1) +
+                            theme_minimal() + 
+                            theme(legend.position = "none") +
+                            theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+                            panel.background = element_blank(), panel.border = element_rect(colour = "black", fill=NA, size=1), axis.text.x=element_blank(), 
+                            axis.ticks.x=element_blank(),axis.text.y=element_blank(), 
+                            axis.ticks.y=element_blank())
+                             
+plot(fungi.nmds.seas.plot)
+
+PERMANOVA.ITS <- adonis(bray.dist.ITS ~ Block + Ecosystem*Precipitation + Ecosystem*Nitrogen + Ecosystem*Collection_date + Collection_date*Precipitation + Collection_date*Nitrogen + Precipitation*Nitrogen, data = nmds.metadata.ITS, strata = nmds.metadata.ITS$Block, permutations = 999)
+
+PERMANOVA.ITS
+
+###Plant###
+median.avg.dist.plant <- vegdist(otu.plant.2015.1, method = "bray")
+bray.dist.plant <- as.data.frame(as.matrix(median.avg.dist.plant))
+write.xlsx2(bray.dist.plant, file = "bray.dist.plant.xlsx", sheetName = "Sheet1", col.names = TRUE, row.names = TRUE, append = FALSE)
+NMDS.plant <- metaMDS(bray.dist.plant, distance = "bray", k = 3, noshare = FALSE, trymax = 400, trace = TRUE)
+stressplot(NMDS.plant)
+coordinates.plant <- data.frame(NMDS.plant$points[,1:3])
+nmds.metadata.plant <- merge(coordinates.plant, metadata.plant.2015.1, by.x = "row.names", by.y = "row.names")
+nmds.metadata.plant <- data.frame(nmds.metadata.plant, col.names	=	TRUE,	row.names	=	TRUE)
+
+plant.nmds.plot <- ggplot(data = nmds.metadata.plant) +
+                   aes(x = MDS1, y = MDS2, color = as.factor(precipitation)) + 
+                   geom_point(aes(shape = as.factor(ecosystem), size = as.factor(ecosystem))) +
+                   scale_color_manual(values = c('#408080', '#FF8040')) +
+                   scale_shape_manual(values = c(17,16)) +
+                   scale_size_manual(values = c(5,5)) +
+                   geom_text(label = as.factor(nmds.metadata.plant$eco.prec), size = 1) +
+                   theme_minimal() + 
+                   theme(legend.position = "right") +
+                   labs(col = "Precipitation", shape = "Ecosystem") + 
+                   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+                   panel.background = element_blank(), panel.border = element_rect(colour = "black", fill=NA, size=1), axis.text.x=element_blank(), 
+                   axis.ticks.x=element_blank(),axis.text.y=element_blank(), 
+                   axis.ticks.y=element_blank())
+
+plot(plant.nmds.plot)
+
+bray.dist.plant <- bray.dist.plant[(names(bray.dist.plant) %in% row.names(metadata.plant.2015.1)),]
+bray.dist.plant <- bray.dist.plant[,(names(bray.dist.plant) %in% row.names(bray.dist.plant))]
+matching.metadata.bray.plant <- metadata.plant.2015.1[c(match(sort(row.names(bray.dist.plant)), sort(row.names(metadata.plant.2015.1)))),]
+
+PERMANOVA.plant <- adonis(bray.dist.plant ~ block + ecosystem*precipitation  + precipitation*nitrogen + ecosystem*nitrogen, data = matching.metadata.bray.plant, strata = matching.metadata.bray.plant$block,  permutations = 999)
+
+PERMANOVA.plant
+
+#stacked bar plot of variance by factors
+variance <- read_excel("~/Google_drive/my_projects/lrgce/final_analysis_finks_etal_2020/variance_fig.xlsx")
+variance <- as.data.frame(variance, col.names	=	TRUE,	row.names	=	TRUE)
+variance[1:3 , 1:3]
+
+c11 <- c("#cacccc",
+         "#4f4447",
+         "#697456",
+         "#91ab98",
+         "#504254",
+         "#408080",
+         "#54bfab",
+         "#306773",
+         "#809a97",
+         "#b48a6f",
+         "#9d7e72")
+
+variance.plot <- ggplot(variance, aes(x = community, y = percent))+
+                 geom_col(aes(fill = factor(factor, levels = c("Residuals", "Block", "Ecosystem", "Ecosystem_collection date","Collection_Date", "Precipitation", "Ecosystem_precipitation", 
+                                                               "Precipitation_collection date", "Precipitation_nitrogen", "Nitrogen", "Ecosystem_nitrogen"))), width = 0.7) +
+                 theme_minimal() +  
+                 theme(axis.line.x=element_line(colour = "black"), axis.line.y=element_line(colour = "black")) + 
+                 scale_fill_manual(values = c11) +
+                 labs(fill = "Factor (s)") +
+                 #ggtitle("Variance Explained By Factor") + #Adds tittle and subtittle. Can modify p and r-squared values + title.
+                 guides(size = "none") # makes the sizes guide dissapear
+  
+plot(variance.plot)
+
+combined.nmds.variance.plots <- ggarrange(bacteria.nmds.plot, fungi.nmds.plot, plant.nmds.plot, variance.plot + font("x.text", size = 10), labels = c("A.", "B.", "C.", "D."), ncol = 2, nrow = 2, widths = c(5,5,5,4))
+plot(combined.nmds.variance.plots)
+
+combined.nmds.season.plots <- ggarrange(bacteria.nmds.seas.plot, fungi.nmds.seas.plot + font("x.text", size = 10), labels = c("A.", "B."), ncol = 1, nrow = 2, align = "hv", widths = c(100,100), heights = c(50,50))
+plot(combined.nmds.season.plots)
+```
+
+```{r Water inputs over plant survey and litter sampling dates}
+
+ambient.water.input <- read_excel("~/Google_drive/my_projects/lrgce/final_analysis_finks_etal_2020/ambient_water_input_figure.xlsx")
+ambient.water.input <- as.data.frame(ambient.water.input, col.names	=	TRUE,	row.names	=	TRUE)
+ambient.water.input[1:2 , 1:3]
+sapply(ambient.water.input, class)
+ambient.water.input.1 <- ambient.water.input %>% mutate_if(is.POSIXt, as.Date)
+ambient.water.input.2 <- ambient.water.input.1 %>% mutate_if(is.POSIXct, as.Date)
+sapply(ambient.water.input.2, class)
+
+reduced.water.input <- read_excel("~/Google_drive/my_projects/lrgce/final_analysis_finks_etal_2020/reduced_water_input_figure.xlsx")
+reduced.water.input <- as.data.frame(reduced.water.input, col.names	=	TRUE,	row.names	=	TRUE)
+reduced.water.input[1:2 , 1:3]
+sapply(reduced.water.input, class)
+reduced.water.input.1 <- reduced.water.input %>% mutate_if(is.POSIXt, as.Date)
+reduced.water.input.2 <- reduced.water.input.1 %>% mutate_if(is.POSIXct, as.Date)
+sapply(reduced.water.input.2, class)
+
+pd = position_dodge(0.5)
+
+water.fig <- ggplot() + geom_point(data = ambient.water.input.2, aes(x = date, y = ambient_water_input_mm), size=2, pch = 19, color = "#408080") +
+             geom_point(data = reduced.water.input.2, aes(x = date, y = reduced_water_input_mm), size=2, pch = 19, position = pd, color = "#000000") +
+             xlab('Dates') +
+             ylab('Precipitation (mm)') +
+             geom_line(data = ambient.water.input.2, aes(x = date, y = ambient_water_input_mm), color = "#408080") +
+             geom_line(data = reduced.water.input.2, aes(x = date, y = reduced_water_input_mm), position = pd, color = "#000000") +
+             scale_y_continuous(breaks = seq(0,70,by=5), expand = c(0, 0)) +
+             scale_x_date(breaks = date_breaks("month"), labels = date_format("%b"), expand = c(0, 0)) +
+             theme(panel.grid.major = element_line(colour = "black", linetype = "dotted"), panel.grid.minor = element_blank(), panel.grid.major.x= element_blank(),
+             panel.background = element_blank(), panel.border = element_rect(colour = "black", fill=NA, size=0.5)) +
+             scale_linetype_manual(values = c(1,1))
+  
+plot(water.fig)
+
+```
+
