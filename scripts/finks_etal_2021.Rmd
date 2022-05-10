@@ -1,5 +1,5 @@
 ---
-title: "R scripts for Finks et al. 2020"
+title: "R scripts for Finks et al. 2021 https://doi.org/10.1525/elementa.2021.00124"
 author: "Sarai S. Finks"
 date: "04/15/2020"
 output: html_document
