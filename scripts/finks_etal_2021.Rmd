@@ -963,3 +963,167 @@ plot(water.fig)
 
 ```
 
+```{r Revisions checking for differences in dispersion (homogeneity of variances) that may confound SIMPER test results}
+
+##Bacteria###
+disp.16s <-
+  betadisper(
+    median.avg.dist.16s,
+    group = nmds.metadata.16s$eco.prec,
+    type = c("centroid"),
+    bias.adjust = TRUE,
+    sqrt.dist = TRUE,
+    add = FALSE
+  )
+
+disp.16s
+anova(disp.16s)
+plot(disp.16s)
+boxplot(disp.16s)
+
+perm.disp.16s <-
+  permutest(
+    disp.16s,
+    group = nmds.metadata.16s$eco.prec,
+    pairwise = FALSE,
+    permutations = 999,
+    parallel = 1
+  )
+
+perm.disp.16s
+
+disp.16s.nit <-
+  betadisper(
+    median.avg.dist.16s,
+    group = nmds.metadata.16s$eco.nit,
+    type = c("centroid"),
+    bias.adjust = TRUE,
+    sqrt.dist = TRUE,
+    add = FALSE
+  )
+
+disp.16s.nit
+anova(disp.16s.nit)
+plot(disp.16s.nit)
+boxplot(disp.16s.nit)
+
+perm.disp.16s.nit <-
+  permutest(
+    disp.16s.nit,
+    group = nmds.metadata.16s$eco.nit,
+    pairwise = FALSE,
+    permutations = 999,
+    parallel = 1
+  )
+
+perm.disp.16s.nit
+
+
+###Fungi###
+disp.ITS <-
+  betadisper(
+    median.avg.dist.ITS,
+    group = nmds.metadata.ITS$eco.prec,
+    type = c("centroid"),
+    bias.adjust = TRUE,
+    sqrt.dist = TRUE,
+    add = FALSE
+  )
+
+disp.ITS
+anova(disp.ITS)
+plot(disp.ITS)
+boxplot(disp.ITS)
+
+perm.disp.ITS <-
+  permutest(
+    disp.ITS,
+    group = nmds.metadata.ITS$eco.prec,
+    pairwise = FALSE,
+    permutations = 999,
+    parallel = 1
+  )
+
+perm.disp.ITS
+
+disp.ITS.nit <-
+  betadisper(
+    median.avg.dist.ITS,
+    group = nmds.metadata.ITS$eco.nit,
+    type = c("centroid"),
+    bias.adjust = TRUE,
+    sqrt.dist = TRUE,
+    add = FALSE
+  )
+
+disp.ITS.nit
+anova(disp.ITS.nit)
+plot(disp.ITS.nit)
+boxplot(disp.ITS.nit)
+
+perm.disp.ITS.nit <-
+  permutest(
+    disp.ITS.nit,
+    group = nmds.metadata.ITS$eco.nit,
+    pairwise = FALSE,
+    permutations = 999,
+    parallel = 1
+  )
+
+perm.disp.ITS.nit
+
+###Plant###
+disp.plant <-
+  betadisper(
+    median.avg.dist.plant,
+    group = nmds.metadata.plant$eco.prec,
+    type = c("centroid"),
+    bias.adjust = TRUE,
+    sqrt.dist = TRUE,
+    add = FALSE
+  )
+
+disp.plant
+anova(disp.plant)
+plot(disp.plant)
+boxplot(disp.plant)
+
+perm.disp.plant <-
+  permutest(
+    disp.plant,
+    group = nmds.metadata.plant$eco.prec,
+    pairwise = FALSE,
+    permutations = 999,
+    parallel = 1
+  )
+
+perm.disp.plant
+
+disp.plant.nit <-
+  betadisper(
+    median.avg.dist.plant,
+    group = nmds.metadata.plant$eco.nit,
+    type = c("centroid"),
+    bias.adjust = TRUE,
+    sqrt.dist = TRUE,
+    add = FALSE
+  )
+
+disp.plant.nit
+anova(disp.plant.nit)
+plot(disp.plant.nit)
+boxplot(disp.plant.nit)
+
+perm.disp.plant.nit <-
+  permutest(
+    disp.plant.nit,
+    group = nmds.metadata.plant$eco.nit,
+    pairwise = FALSE,
+    permutations = 999,
+    parallel = 1
+  )
+
+perm.disp.plant.nit
+
+
+```
