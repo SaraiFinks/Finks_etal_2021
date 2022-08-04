@@ -15,7 +15,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r Setting your working directory}
 getwd()
-setwd("/Users/martinylab/Google_drive/my_projects/lrgce/final_analysis_finks_etal_2020")
+setwd("/yourworkingdirectory/")
 ```
 
 ```{r load libraries with dependencies}
